@@ -47,9 +47,9 @@ table{width:100%;border-collapse:collapse;background:#fff;font-size:.9rem;margin
 th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--color-line);}
 th{color:var(--color-navy);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;}
 .status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;}
-.status-Approved{background:#e5ecdb;color:var(--color-olive);}
+.status-Approved,.status-Paid{background:#e5ecdb;color:var(--color-olive);}
 .status-Pending{background:#f4e6d0;color:#a3711b;}
-.status-Rejected{background:#fbe0e2;color:var(--color-red);}
+.status-Rejected,.status-HalfPaid{background:#fbe0e2;color:var(--color-red);}
 </style>
 </head>
 <body>
@@ -108,8 +108,14 @@ th{color:var(--color-navy);font-size:.78rem;text-transform:uppercase;letter-spac
 
     <h2 style="font-size:1.1rem;">My leave applications</h2>
     <table>
-      <thead><tr><th>Type</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+      <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
       <tbody id="leave-table"></tbody>
+    </table>
+
+    <h2 style="font-size:1.1rem;margin-top:32px;">My salary</h2>
+    <table>
+      <thead><tr><th>Month</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody id="salary-table"></tbody>
     </table>
 
     <div id="driver-section" class="hidden" style="margin-top:32px;">
@@ -191,6 +197,7 @@ async function afterLogin(){
   document.getElementById('who-line').textContent = profile.full_name + ' · ' + profile.role;
   if (profile.role === 'driver') document.getElementById('driver-section').classList.remove('hidden');
   loadLeave();
+  loadMySalary();
   if (profile.role === 'driver') loadTrips();
 }
 
@@ -222,8 +229,22 @@ async function loadLeave(){
   tbody.innerHTML = '';
   (data||[]).forEach(row => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.leave_type||''}</td><td>${row.start_date}</td><td>${row.end_date}</td>
+    const days = Math.round((new Date(row.end_date) - new Date(row.start_date)) / 86400000) + 1;
+    tr.innerHTML = `<td>${row.leave_type||''}</td><td>${row.start_date}</td><td>${row.end_date}</td><td>${days}</td>
       <td><span class="status-pill status-${row.status}">${row.status}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadMySalary(){
+  const { data } = await db.from('salaries').select('*').eq('employee_id', currentUser.id).order('month', {ascending:false});
+  const tbody = document.getElementById('salary-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    const statusClass = row.status.replace(/\s+/g,'');
+    tr.innerHTML = `<td>${row.month}</td><td>USD ${Number(row.monthly_amount).toLocaleString('en-ZW',{minimumFractionDigits:2})}</td>
+      <td><span class="status-pill status-${statusClass}">${row.status}</span></td>`;
     tbody.appendChild(tr);
   });
 }
