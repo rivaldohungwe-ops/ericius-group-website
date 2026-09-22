@@ -67,6 +67,12 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
 .status-Pending{background:#f4e6d0;color:#a3711b;}
 .status-HalfPaid,.status-Rejected{background:#fbe0e2;color:var(--color-red);}
 .chart-wrap{background:#fff;border:1px solid var(--color-line);padding:20px;margin-top:24px;}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+@media (max-width:860px){.chart-grid{grid-template-columns:1fr;}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--color-navy);color:#fff;
+  padding:12px 20px;border-radius:4px;display:flex;align-items:center;gap:14px;font-size:.9rem;box-shadow:0 4px 20px rgba(0,0,0,.2);z-index:100;}
+.toast button{background:var(--color-red);color:#fff;padding:6px 14px;font-size:.85rem;}
+.toast.hidden{display:none;}
 .section-title{font-size:1.3rem;margin-bottom:16px;}
 .note{font-size:.82rem;color:#4A463E;margin-top:6px;}
 </style>
@@ -149,6 +155,10 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
     </table>
 
     <div class="chart-wrap"><canvas id="finance-chart" height="90"></canvas></div>
+    <div class="chart-grid">
+      <div class="chart-wrap"><canvas id="category-chart" height="220"></canvas></div>
+      <div class="chart-wrap"><canvas id="trend-chart" height="220"></canvas></div>
+    </div>
   </div>
 
   <!-- Salaries -->
@@ -161,7 +171,7 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
       <button type="submit" class="btn-primary">Add / update</button>
     </form>
     <table>
-      <thead><tr><th>Employee</th><th>Month</th><th>Amount</th><th>Linked account</th><th>Status</th></tr></thead>
+      <thead><tr><th>Employee</th><th>Month</th><th>Amount</th><th>Linked account</th><th>Status</th><th></th></tr></thead>
       <tbody id="salary-table"></tbody>
     </table>
   </div>
@@ -194,6 +204,11 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
   </div>
 </div>
 
+<div id="undo-toast" class="toast hidden">
+  <span id="undo-text"></span>
+  <button onclick="undoDelete()">Undo</button>
+</div>
+
 <script>
 // ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
 const SUPABASE_URL = 'https://almaivbsivtjfxmftspy.supabase.co';
@@ -205,7 +220,42 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let currentProfile = null;
 let financeChart = null;
+let categoryChart = null;
+let trendChart = null;
 let financeData = [];
+let lastDeleted = null; // { type: 'financial'|'salary', data: {...}, timeoutId }
+
+function showUndoToast(text){
+  const toast = document.getElementById('undo-toast');
+  document.getElementById('undo-text').textContent = text;
+  toast.classList.remove('hidden');
+  if (lastDeleted && lastDeleted.timeoutId) clearTimeout(lastDeleted.timeoutId);
+  lastDeleted.timeoutId = setTimeout(() => { toast.classList.add('hidden'); lastDeleted = null; }, 8000);
+}
+
+async function undoDelete(){
+  if (!lastDeleted) return;
+  document.getElementById('undo-toast').classList.add('hidden');
+  if (lastDeleted.type === 'financial') {
+    const { id, ...rest } = lastDeleted.data;
+    await db.from('financial_entries').insert(rest);
+    await logActivity('Undid delete', 'Restored a financial entry');
+    loadFinance();
+  } else if (lastDeleted.type === 'salary') {
+    const { id, expense_entry_id, ...rest } = lastDeleted.data;
+    let newExpenseId = null;
+    if (lastDeleted.expenseData) {
+      const { id: oldExpId, ...expRest } = lastDeleted.expenseData;
+      const { data } = await db.from('financial_entries').insert(expRest).select().single();
+      newExpenseId = data.id;
+    }
+    await db.from('salaries').insert({ ...rest, expense_entry_id: newExpenseId });
+    await logActivity('Undid delete', 'Restored a salary record');
+    loadSalaries();
+    loadFinance();
+  }
+  lastDeleted = null;
+}
 
 function setAuthMode(mode){
   document.getElementById('tab-login').classList.toggle('active', mode==='login');
@@ -349,8 +399,11 @@ document.getElementById('finance-form').addEventListener('submit', async (e) => 
 
 async function deleteFinance(id, label){
   if (!confirm('Delete this entry?')) return;
+  const row = financeData.find(r => r.id === id);
   await db.from('financial_entries').delete().eq('id', id);
   await logActivity('Deleted financial entry', label);
+  lastDeleted = { type: 'financial', data: row };
+  showUndoToast(`Deleted "${label}".`);
   loadFinance();
 }
 
@@ -391,7 +444,38 @@ async function loadFinance(){
   if (financeChart) financeChart.destroy();
   financeChart = new Chart(document.getElementById('finance-chart'), {
     type: 'bar', data: chartData,
-    options: { responsive:true, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}} }
+    options: { responsive:true, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Income vs Expenses by month'}}, scales:{y:{beginAtZero:true}} }
+  });
+
+  // Expense breakdown by category
+  const byCategory = {};
+  (data||[]).filter(r => r.entry_type === 'expense').forEach(r => {
+    const cat = r.category || 'Uncategorized';
+    byCategory[cat] = (byCategory[cat] || 0) + Number(r.amount);
+  });
+  const catLabels = Object.keys(byCategory);
+  const palette = ['#D81E2C','#23255B','#6E7B3F','#C98A3A','#7A3B5E','#3A7A6E','#A34A2A','#4A5A9E'];
+  if (categoryChart) categoryChart.destroy();
+  categoryChart = new Chart(document.getElementById('category-chart'), {
+    type: 'doughnut',
+    data: { labels: catLabels, datasets: [{ data: catLabels.map(c => byCategory[c]), backgroundColor: catLabels.map((_,i)=>palette[i % palette.length]) }] },
+    options: { responsive:true, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Where expenses go'}} }
+  });
+
+  // Cumulative profit/loss trend, oldest to newest
+  const sorted = [...(data||[])].sort((a,b) => a.entry_date.localeCompare(b.entry_date));
+  let running = 0;
+  const trendLabels = [], trendValues = [];
+  sorted.forEach(r => {
+    running += r.entry_type === 'income' ? Number(r.amount) : -Number(r.amount);
+    trendLabels.push(r.entry_date);
+    trendValues.push(running);
+  });
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type: 'line',
+    data: { labels: trendLabels, datasets: [{ label: 'Cumulative profit/loss', data: trendValues, borderColor: '#23255B', backgroundColor: 'rgba(35,37,91,0.08)', fill:true, tension:.25 }] },
+    options: { responsive:true, plugins:{legend:{display:false}, title:{display:true,text:'Running profit/loss over time'}}, scales:{y:{}} }
   });
 }
 
@@ -445,8 +529,10 @@ async function updateSalaryStatus(id, status, name, monthlyAmount, expenseEntryI
   loadFinance();
 }
 
+let salariesData = [];
 async function loadSalaries(){
   const { data } = await db.from('salaries').select('*').order('month', {ascending:false});
+  salariesData = data || [];
   const tbody = document.getElementById('salary-table');
   tbody.innerHTML = '';
   (data||[]).forEach(row => {
@@ -466,9 +552,29 @@ async function loadSalaries(){
         <option value="Pending" ${row.status==='Pending'?'selected':''}>Pending</option>
         <option value="Half Paid" ${row.status==='Half Paid'?'selected':''}>Half Paid</option>
         <option value="Paid" ${row.status==='Paid'?'selected':''}>Paid</option>
-      </select></td>`;
+      </select></td>
+      <td><button class="btn-small btn-reject" onclick="deleteSalary(${row.id})">Delete</button></td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function deleteSalary(salaryId){
+  const row = salariesData.find(r => r.id === salaryId);
+  if (!row) return;
+  const label = `${row.employee_name} — ${row.month}`;
+  if (!confirm(`Delete the salary record for ${label}? This also removes its linked expense entry, if any.`)) return;
+
+  let expenseData = null;
+  if (row.expense_entry_id) {
+    expenseData = financeData.find(f => f.id === row.expense_entry_id) || null;
+    await db.from('financial_entries').delete().eq('id', row.expense_entry_id);
+  }
+  await db.from('salaries').delete().eq('id', salaryId);
+  await logActivity('Deleted salary record', label);
+  lastDeleted = { type: 'salary', data: row, expenseData };
+  showUndoToast(`Deleted salary record for ${label}.`);
+  loadSalaries();
+  loadFinance();
 }
 
 async function relinkSalary(salaryId, employeeId){
