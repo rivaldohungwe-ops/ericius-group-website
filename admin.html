@@ -66,7 +66,7 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
 .status-Paid,.status-Approved{background:#e5ecdb;color:var(--color-olive);}
 .status-Pending{background:#f4e6d0;color:#a3711b;}
 .status-HalfPaid,.status-Rejected{background:#fbe0e2;color:var(--color-red);}
-.chart-wrap{background:#fff;border:1px solid var(--color-line);padding:20px;margin-top:24px;}
+.chart-wrap{background:#fff;border:1px solid var(--color-line);padding:20px;margin-top:24px;position:relative;height:320px;}
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
 @media (max-width:860px){.chart-grid{grid-template-columns:1fr;}}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--color-navy);color:#fff;
@@ -154,10 +154,10 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
       <tbody id="finance-table"></tbody>
     </table>
 
-    <div class="chart-wrap"><canvas id="finance-chart" height="90"></canvas></div>
+    <div class="chart-wrap"><canvas id="finance-chart"></canvas></div>
     <div class="chart-grid">
-      <div class="chart-wrap"><canvas id="category-chart" height="220"></canvas></div>
-      <div class="chart-wrap"><canvas id="trend-chart" height="220"></canvas></div>
+      <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+      <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
     </div>
   </div>
 
@@ -444,7 +444,7 @@ async function loadFinance(){
   if (financeChart) financeChart.destroy();
   financeChart = new Chart(document.getElementById('finance-chart'), {
     type: 'bar', data: chartData,
-    options: { responsive:true, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Income vs Expenses by month'}}, scales:{y:{beginAtZero:true}} }
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Income vs Expenses by month'}}, scales:{y:{beginAtZero:true}} }
   });
 
   // Expense breakdown by category
@@ -459,7 +459,7 @@ async function loadFinance(){
   categoryChart = new Chart(document.getElementById('category-chart'), {
     type: 'doughnut',
     data: { labels: catLabels, datasets: [{ data: catLabels.map(c => byCategory[c]), backgroundColor: catLabels.map((_,i)=>palette[i % palette.length]) }] },
-    options: { responsive:true, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Where expenses go'}} }
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}, title:{display:true,text:'Where expenses go'}} }
   });
 
   // Cumulative profit/loss trend, oldest to newest
@@ -475,7 +475,7 @@ async function loadFinance(){
   trendChart = new Chart(document.getElementById('trend-chart'), {
     type: 'line',
     data: { labels: trendLabels, datasets: [{ label: 'Cumulative profit/loss', data: trendValues, borderColor: '#23255B', backgroundColor: 'rgba(35,37,91,0.08)', fill:true, tension:.25 }] },
-    options: { responsive:true, plugins:{legend:{display:false}, title:{display:true,text:'Running profit/loss over time'}}, scales:{y:{}} }
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, title:{display:true,text:'Running profit/loss over time'}}, scales:{y:{}} }
   });
 }
 
