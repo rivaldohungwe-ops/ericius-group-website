@@ -161,7 +161,7 @@ th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spaci
       <button type="submit" class="btn-primary">Add / update</button>
     </form>
     <table>
-      <thead><tr><th>Employee</th><th>Month</th><th>Amount</th><th>Status</th></tr></thead>
+      <thead><tr><th>Employee</th><th>Month</th><th>Amount</th><th>Linked account</th><th>Status</th></tr></thead>
       <tbody id="salary-table"></tbody>
     </table>
   </div>
@@ -438,7 +438,8 @@ async function updateSalaryStatus(id, status, name, monthlyAmount, expenseEntryI
     newExpenseId = null;
   }
 
-  await db.from('salaries').update({ status, expense_entry_id: newExpenseId, updated_by: currentUser.id, updated_at: new Date().toISOString() }).eq('id', id);
+  const { error } = await db.from('salaries').update({ status, expense_entry_id: newExpenseId, updated_by: currentUser.id, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { alert('Could not save status: ' + error.message); loadSalaries(); return; }
   await logActivity('Updated salary status', `${name} → ${status}`);
   loadSalaries();
   loadFinance();
@@ -451,7 +452,16 @@ async function loadSalaries(){
   (data||[]).forEach(row => {
     const tr = document.createElement('tr');
     const safeName = (row.employee_name||'').replace(/'/g,"");
+    const linkOptions = employeeOptions.map(e =>
+      `<option value="${e.id}" ${e.id===row.employee_id?'selected':''}>${e.full_name} (${e.role})</option>`
+    ).join('');
+    const linkCell = row.employee_id
+      ? `<select onchange="relinkSalary(${row.id}, this.value)"><option value="">— unlink —</option>${linkOptions}</select>`
+      : `<select onchange="relinkSalary(${row.id}, this.value)" style="border-color:var(--color-red);">
+           <option value="">⚠ Not linked — pick account</option>${linkOptions}
+         </select>`;
     tr.innerHTML = `<td>${row.employee_name}</td><td>${row.month}</td><td>${money(row.monthly_amount)}</td>
+      <td>${linkCell}</td>
       <td><select onchange="updateSalaryStatus(${row.id}, this.value, '${safeName}', ${row.monthly_amount}, ${row.expense_entry_id || 'null'}, '${row.month}')">
         <option value="Pending" ${row.status==='Pending'?'selected':''}>Pending</option>
         <option value="Half Paid" ${row.status==='Half Paid'?'selected':''}>Half Paid</option>
@@ -459,6 +469,17 @@ async function loadSalaries(){
       </select></td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function relinkSalary(salaryId, employeeId){
+  const chosen = employeeOptions.find(x => x.id === employeeId);
+  const update = employeeId
+    ? { employee_id: employeeId, employee_name: chosen.full_name }
+    : { employee_id: null };
+  const { error } = await db.from('salaries').update(update).eq('id', salaryId);
+  if (error) { alert(error.message); return; }
+  await logActivity('Linked salary record to account', chosen ? chosen.full_name : 'unlinked');
+  loadSalaries();
 }
 
 // ---------- Leave Approvals ----------
