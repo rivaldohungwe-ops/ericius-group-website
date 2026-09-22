@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ericius Group — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --color-red:#D81E2C; --color-navy:#23255B; --color-sand:#F6F2E8;
+  --color-ink:#1C1A17; --color-olive:#6E7B3F; --color-line:#DED5C4;
+  --font-display:'Fraunces',Georgia,serif; --font-body:'IBM Plex Sans',Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--color-sand);color:var(--color-ink);font-family:var(--font-body);}
+h1,h2,h3{font-family:var(--font-display);color:var(--color-navy);margin:0 0 .3em;}
+.hidden{display:none !important;}
+input,select,textarea,button{font-family:var(--font-body);font-size:.95rem;}
+input,select,textarea{padding:9px 10px;border:1px solid var(--color-line);border-radius:3px;background:#fff;width:100%;}
+button{cursor:pointer;border:none;border-radius:3px;padding:9px 16px;font-weight:500;}
+.btn-primary{background:var(--color-red);color:#fff;}
+.btn-primary:hover{background:#B8151F;}
+.btn-ghost{background:transparent;border:1px solid var(--color-navy);color:var(--color-navy);}
+.btn-small{padding:5px 10px;font-size:.82rem;}
+.btn-approve{background:var(--color-olive);color:#fff;}
+.btn-reject{background:var(--color-red);color:#fff;}
+
+/* Auth screen */
+#auth-screen{max-width:420px;margin:80px auto;padding:0 20px;}
+.auth-card{background:#fff;border:1px solid var(--color-line);padding:32px;}
+.auth-toggle{display:flex;gap:8px;margin-bottom:20px;}
+.auth-toggle button{flex:1;background:var(--color-sand);color:var(--color-navy);border:1px solid var(--color-line);}
+.auth-toggle button.active{background:var(--color-navy);color:#fff;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:.85rem;margin-bottom:5px;color:#4A463E;}
+#auth-msg{font-size:.88rem;margin-top:10px;color:var(--color-red);}
+
+/* Dashboard shell */
+#dashboard{display:none;}
+.topbar{background:var(--color-navy);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;}
+.topbar .who{font-size:.88rem;opacity:.85;}
+.tabs{display:flex;gap:4px;background:#fff;border-bottom:1px solid var(--color-line);padding:0 24px;overflow-x:auto;}
+.tabs button{background:none;border:none;padding:14px 16px;color:#4A463E;border-bottom:3px solid transparent;border-radius:0;white-space:nowrap;}
+.tabs button.active{color:var(--color-navy);border-color:var(--color-red);font-weight:600;}
+.panel{padding:28px 24px;max-width:1100px;margin:0 auto;display:none;}
+.panel.active{display:block;}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+.card{background:#fff;border:1px solid var(--color-line);padding:18px 20px;}
+.card .label{font-size:.8rem;color:#4A463E;}
+.card .value{font-family:var(--font-display);font-size:1.6rem;color:var(--color-navy);}
+.card.negative .value{color:var(--color-red);}
+
+.form-row{display:flex;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--color-line);padding:16px;margin-bottom:20px;align-items:end;}
+.form-row .field{flex:1;min-width:130px;margin-bottom:0;}
+.form-row button{align-self:flex-end;}
+
+table{width:100%;border-collapse:collapse;background:#fff;font-size:.9rem;}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--color-line);}
+th{color:var(--color-navy);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;}
+.status-Paid,.status-Approved{background:#e5ecdb;color:var(--color-olive);}
+.status-Pending{background:#f4e6d0;color:#a3711b;}
+.status-Half.Paid,.status-Rejected{background:#fbe0e2;color:var(--color-red);}
+.chart-wrap{background:#fff;border:1px solid var(--color-line);padding:20px;margin-top:24px;}
+.section-title{font-size:1.3rem;margin-bottom:16px;}
+.note{font-size:.82rem;color:#4A463E;margin-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- ============== AUTH SCREEN ============== -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1 style="font-size:1.4rem;">Ericius Group — Admin</h1>
+    <div class="auth-toggle">
+      <button id="tab-login" class="active" onclick="setAuthMode('login')">Log in</button>
+      <button id="tab-signup" onclick="setAuthMode('signup')">Sign up</button>
+    </div>
+
+    <form id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" required></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" required></div>
+      <button type="submit" class="btn-primary" style="width:100%;">Log in</button>
+    </form>
+
+    <form id="signup-form" class="hidden">
+      <div class="field"><label>Full name</label><input type="text" id="signup-name" required></div>
+      <div class="field"><label>Phone number</label><input type="tel" id="signup-phone" required></div>
+      <div class="field"><label>Email</label><input type="email" id="signup-email" required></div>
+      <div class="field"><label>Password</label><input type="password" id="signup-password" required minlength="6"></div>
+      <button type="submit" class="btn-primary" style="width:100%;">Create account</button>
+      <p class="note">New accounts start with no admin access. An existing admin has to upgrade your role in Supabase (Table Editor → profiles → role → admin) before you can see this dashboard.</p>
+    </form>
+    <p id="auth-msg"></p>
+  </div>
+</div>
+
+<!-- ============== DASHBOARD ============== -->
+<div id="dashboard">
+  <div class="topbar">
+    <strong>Ericius Group — Admin</strong>
+    <span class="who" id="who-line"></span>
+    <button class="btn-ghost" style="color:#fff;border-color:#fff;" onclick="logOut()">Log out</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-panel="panel-finance" onclick="showPanel('panel-finance')">Financial Statements</button>
+    <button class="tab-btn" data-panel="panel-salaries" onclick="showPanel('panel-salaries')">Salaries</button>
+    <button class="tab-btn" data-panel="panel-leave" onclick="showPanel('panel-leave')">Leave Approvals</button>
+    <button class="tab-btn" data-panel="panel-trips" onclick="showPanel('panel-trips')">Vehicle Approvals</button>
+    <button class="tab-btn" data-panel="panel-log" onclick="showPanel('panel-log')">Activity Log</button>
+  </div>
+
+  <!-- Financial Statements -->
+  <div id="panel-finance" class="panel active">
+    <h2 class="section-title">Financial Statements</h2>
+    <div class="cards">
+      <div class="card"><div class="label">Total income</div><div class="value" id="stat-income">—</div></div>
+      <div class="card"><div class="label">Total expenses</div><div class="value" id="stat-expenses">—</div></div>
+      <div class="card" id="stat-net-card"><div class="label">Net profit / loss</div><div class="value" id="stat-net">—</div></div>
+    </div>
+
+    <form id="finance-form" class="form-row">
+      <div class="field"><label>Type</label>
+        <select id="fin-type"><option value="income">Income</option><option value="expense">Expense</option></select>
+      </div>
+      <div class="field"><label>Category</label><input type="text" id="fin-category" placeholder="e.g. Farming"></div>
+      <div class="field"><label>Description</label><input type="text" id="fin-description" placeholder="e.g. Maize sale"></div>
+      <div class="field"><label>Amount</label><input type="number" step="0.01" id="fin-amount" required></div>
+      <div class="field"><label>Date</label><input type="date" id="fin-date" required></div>
+      <button type="submit" class="btn-primary">Add entry</button>
+    </form>
+
+    <table>
+      <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead>
+      <tbody id="finance-table"></tbody>
+    </table>
+
+    <div class="chart-wrap"><canvas id="finance-chart" height="90"></canvas></div>
+  </div>
+
+  <!-- Salaries -->
+  <div id="panel-salaries" class="panel">
+    <h2 class="section-title">Employee Salaries</h2>
+    <form id="salary-form" class="form-row">
+      <div class="field"><label>Employee name</label><input type="text" id="sal-name" required></div>
+      <div class="field"><label>Month</label><input type="month" id="sal-month" required></div>
+      <div class="field"><label>Amount</label><input type="number" step="0.01" id="sal-amount" required></div>
+      <button type="submit" class="btn-primary">Add / update</button>
+    </form>
+    <table>
+      <thead><tr><th>Employee</th><th>Month</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody id="salary-table"></tbody>
+    </table>
+  </div>
+
+  <!-- Leave Approvals -->
+  <div id="panel-leave" class="panel">
+    <h2 class="section-title">Leave Approvals</h2>
+    <table>
+      <thead><tr><th>Applicant</th><th>Type</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+      <tbody id="leave-table"></tbody>
+    </table>
+  </div>
+
+  <!-- Vehicle Approvals -->
+  <div id="panel-trips" class="panel">
+    <h2 class="section-title">Vehicle Trip Approvals</h2>
+    <table>
+      <thead><tr><th>Driver</th><th>Purpose</th><th>Distance (km)</th><th>Depart</th><th>Expected arrival</th><th>Passengers</th><th>Cost</th><th>Status</th><th></th></tr></thead>
+      <tbody id="trips-table"></tbody>
+    </table>
+  </div>
+
+  <!-- Activity Log -->
+  <div id="panel-log" class="panel">
+    <h2 class="section-title">Activity Log</h2>
+    <table>
+      <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
+      <tbody id="log-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
+const SUPABASE_URL = 'https://almaivbsivtjfxmftspy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_RcNwlecy97rSi5EmBIozuQ_QePUjp9y';
+// =====================================================================
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let currentProfile = null;
+let financeChart = null;
+
+function setAuthMode(mode){
+  document.getElementById('tab-login').classList.toggle('active', mode==='login');
+  document.getElementById('tab-signup').classList.toggle('active', mode==='signup');
+  document.getElementById('login-form').classList.toggle('hidden', mode!=='login');
+  document.getElementById('signup-form').classList.toggle('hidden', mode!=='signup');
+  document.getElementById('auth-msg').textContent = '';
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { document.getElementById('auth-msg').textContent = error.message; return; }
+  await afterLogin();
+});
+
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const full_name = document.getElementById('signup-name').value;
+  const phone = document.getElementById('signup-phone').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const { error } = await db.auth.signUp({ email, password, options: { data: { full_name, phone, role: 'employee' } } });
+  if (error) { document.getElementById('auth-msg').textContent = error.message; return; }
+  document.getElementById('auth-msg').style.color = 'var(--color-olive)';
+  document.getElementById('auth-msg').textContent = 'Account created. Ask an admin to upgrade your role, then log in.';
+});
+
+async function afterLogin(){
+  const { data: { user } } = await db.auth.getUser();
+  currentUser = user;
+  const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = profile;
+  if (!profile || profile.role !== 'admin') {
+    document.getElementById('auth-msg').textContent = 'This account does not have admin access yet.';
+    await db.auth.signOut();
+    return;
+  }
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('who-line').textContent = profile.full_name + ' · admin';
+  loadFinance(); loadSalaries(); loadLeave(); loadTrips(); loadLog();
+}
+
+async function logOut(){
+  await db.auth.signOut();
+  location.reload();
+}
+
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === id));
+}
+
+async function logActivity(action, details){
+  await db.from('activity_log').insert({
+    actor_id: currentUser.id, actor_name: currentProfile.full_name, action, details
+  });
+  loadLog();
+}
+
+function money(n){ return 'USD ' + Number(n||0).toLocaleString('en-ZW', {minimumFractionDigits:2}); }
+
+// ---------- Financial Statements ----------
+document.getElementById('finance-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const entry = {
+    entry_type: document.getElementById('fin-type').value,
+    category: document.getElementById('fin-category').value,
+    description: document.getElementById('fin-description').value,
+    amount: parseFloat(document.getElementById('fin-amount').value),
+    entry_date: document.getElementById('fin-date').value,
+    created_by: currentUser.id
+  };
+  const { error } = await db.from('financial_entries').insert(entry);
+  if (error) { alert(error.message); return; }
+  await logActivity('Added financial entry', `${entry.entry_type} — ${entry.description || entry.category} — ${money(entry.amount)}`);
+  e.target.reset();
+  loadFinance();
+});
+
+async function deleteFinance(id, label){
+  if (!confirm('Delete this entry?')) return;
+  await db.from('financial_entries').delete().eq('id', id);
+  await logActivity('Deleted financial entry', label);
+  loadFinance();
+}
+
+async function loadFinance(){
+  const { data, error } = await db.from('financial_entries').select('*').order('entry_date', {ascending:false});
+  if (error) { console.error(error); return; }
+  const tbody = document.getElementById('finance-table');
+  tbody.innerHTML = '';
+  let totalIncome = 0, totalExpense = 0;
+  const byMonth = {};
+  (data||[]).forEach(row => {
+    if (row.entry_type === 'income') totalIncome += Number(row.amount); else totalExpense += Number(row.amount);
+    const m = row.entry_date.slice(0,7);
+    byMonth[m] = byMonth[m] || {income:0, expense:0};
+    byMonth[m][row.entry_type] += Number(row.amount);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.entry_date}</td><td style="text-transform:capitalize">${row.entry_type}</td>
+      <td>${row.category||''}</td><td>${row.description||''}</td><td>${money(row.amount)}</td>
+      <td><button class="btn-small btn-reject" onclick="deleteFinance(${row.id}, '${(row.description||row.category||'').replace(/'/g,"")}')">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('stat-income').textContent = money(totalIncome);
+  document.getElementById('stat-expenses').textContent = money(totalExpense);
+  const net = totalIncome - totalExpense;
+  document.getElementById('stat-net').textContent = money(net);
+  document.getElementById('stat-net-card').classList.toggle('negative', net < 0);
+
+  const months = Object.keys(byMonth).sort();
+  const chartData = {
+    labels: months,
+    datasets: [
+      { label: 'Income', data: months.map(m => byMonth[m].income), backgroundColor: '#6E7B3F' },
+      { label: 'Expenses', data: months.map(m => byMonth[m].expense), backgroundColor: '#D81E2C' }
+    ]
+  };
+  if (financeChart) financeChart.destroy();
+  financeChart = new Chart(document.getElementById('finance-chart'), {
+    type: 'bar', data: chartData,
+    options: { responsive:true, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
+// ---------- Salaries ----------
+document.getElementById('salary-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const row = {
+    employee_name: document.getElementById('sal-name').value,
+    month: document.getElementById('sal-month').value,
+    monthly_amount: parseFloat(document.getElementById('sal-amount').value),
+    updated_by: currentUser.id
+  };
+  const { error } = await db.from('salaries').insert(row);
+  if (error) { alert(error.message); return; }
+  await logActivity('Added salary record', `${row.employee_name} — ${row.month} — ${money(row.monthly_amount)}`);
+  e.target.reset();
+  loadSalaries();
+});
+
+async function updateSalaryStatus(id, status, name){
+  await db.from('salaries').update({ status, updated_by: currentUser.id, updated_at: new Date().toISOString() }).eq('id', id);
+  await logActivity('Updated salary status', `${name} → ${status}`);
+  loadSalaries();
+}
+
+async function loadSalaries(){
+  const { data } = await db.from('salaries').select('*').order('month', {ascending:false});
+  const tbody = document.getElementById('salary-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.employee_name}</td><td>${row.month}</td><td>${money(row.monthly_amount)}</td>
+      <td><select onchange="updateSalaryStatus(${row.id}, this.value, '${row.employee_name.replace(/'/g,"")}')">
+        <option value="Pending" ${row.status==='Pending'?'selected':''}>Pending</option>
+        <option value="Half Paid" ${row.status==='Half Paid'?'selected':''}>Half Paid</option>
+        <option value="Paid" ${row.status==='Paid'?'selected':''}>Paid</option>
+      </select></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------- Leave Approvals ----------
+async function decideLeave(id, status, name){
+  await db.from('leave_applications').update({ status, decided_by: currentUser.id, decided_at: new Date().toISOString() }).eq('id', id);
+  await logActivity('Decided leave application', `${name} → ${status}`);
+  loadLeave();
+}
+
+async function loadLeave(){
+  const { data } = await db.from('leave_applications').select('*').order('created_at', {ascending:false});
+  const tbody = document.getElementById('leave-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    const actions = row.status === 'Pending'
+      ? `<button class="btn-small btn-approve" onclick="decideLeave(${row.id},'Approved','${(row.applicant_name||'').replace(/'/g,"")}')">Approve</button>
+         <button class="btn-small btn-reject" onclick="decideLeave(${row.id},'Rejected','${(row.applicant_name||'').replace(/'/g,"")}')">Reject</button>`
+      : '';
+    tr.innerHTML = `<td>${row.applicant_name||''}</td><td>${row.leave_type||''}</td><td>${row.start_date}</td><td>${row.end_date}</td>
+      <td>${row.reason||''}</td><td><span class="status-pill status-${row.status.replace(' ','.')}">${row.status}</span></td><td>${actions}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------- Vehicle Approvals ----------
+async function decideTrip(id, status, name){
+  await db.from('vehicle_trips').update({ status, decided_by: currentUser.id, decided_at: new Date().toISOString() }).eq('id', id);
+  await logActivity('Decided vehicle trip', `${name} → ${status}`);
+  loadTrips();
+}
+
+async function loadTrips(){
+  const { data } = await db.from('vehicle_trips').select('*').order('created_at', {ascending:false});
+  const tbody = document.getElementById('trips-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    const actions = row.status === 'Pending'
+      ? `<button class="btn-small btn-approve" onclick="decideTrip(${row.id},'Approved','${(row.driver_name||'').replace(/'/g,"")}')">Approve</button>
+         <button class="btn-small btn-reject" onclick="decideTrip(${row.id},'Rejected','${(row.driver_name||'').replace(/'/g,"")}')">Reject</button>`
+      : '';
+    tr.innerHTML = `<td>${row.driver_name||''}</td><td>${row.purpose||''}</td><td>${row.expected_distance_km||''}</td>
+      <td>${row.departure_time ? new Date(row.departure_time).toLocaleString():''}</td>
+      <td>${row.expected_arrival_time ? new Date(row.expected_arrival_time).toLocaleString():''}</td>
+      <td>${row.passengers||''}</td><td>${row.cost ? money(row.cost):'—'}</td>
+      <td><span class="status-pill status-${row.status.replace(' ','.')}">${row.status}</span></td><td>${actions}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------- Activity Log ----------
+async function loadLog(){
+  const { data } = await db.from('activity_log').select('*').order('created_at', {ascending:false}).limit(200);
+  const tbody = document.getElementById('log-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${new Date(row.created_at).toLocaleString()}</td><td>${row.actor_name||''}</td><td>${row.action}</td><td>${row.details||''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Restore session on reload
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) await afterLogin();
+})();
+document.getElementById('fin-date').valueAsDate = new Date();
+</script>
+</body>
+</html>

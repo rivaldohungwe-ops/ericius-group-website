@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ericius Group — Staff Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --color-red:#D81E2C; --color-navy:#23255B; --color-sand:#F6F2E8;
+  --color-ink:#1C1A17; --color-olive:#6E7B3F; --color-line:#DED5C4;
+  --font-display:'Fraunces',Georgia,serif; --font-body:'IBM Plex Sans',Arial,sans-serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--color-sand);color:var(--color-ink);font-family:var(--font-body);}
+h1,h2{font-family:var(--font-display);color:var(--color-navy);margin:0 0 .3em;}
+.hidden{display:none !important;}
+input,select,textarea,button{font-family:var(--font-body);font-size:.95rem;}
+input,select,textarea{padding:9px 10px;border:1px solid var(--color-line);border-radius:3px;background:#fff;width:100%;}
+button{cursor:pointer;border:none;border-radius:3px;padding:9px 16px;font-weight:500;}
+.btn-primary{background:var(--color-red);color:#fff;}
+.btn-primary:hover{background:#B8151F;}
+.btn-ghost{background:transparent;border:1px solid var(--color-navy);color:var(--color-navy);}
+
+#auth-screen{max-width:420px;margin:80px auto;padding:0 20px;}
+.auth-card{background:#fff;border:1px solid var(--color-line);padding:32px;}
+.auth-toggle{display:flex;gap:8px;margin-bottom:20px;}
+.auth-toggle button{flex:1;background:var(--color-sand);color:var(--color-navy);border:1px solid var(--color-line);}
+.auth-toggle button.active{background:var(--color-navy);color:#fff;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:.85rem;margin-bottom:5px;color:#4A463E;}
+.checkbox-field{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.checkbox-field input{width:auto;}
+#auth-msg{font-size:.88rem;margin-top:10px;color:var(--color-red);}
+
+#dashboard{display:none;}
+.topbar{background:var(--color-navy);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;}
+.topbar .who{font-size:.88rem;opacity:.85;}
+.wrap{max-width:800px;margin:0 auto;padding:28px 24px;}
+.card-block{background:#fff;border:1px solid var(--color-line);padding:22px;margin-bottom:28px;}
+.field-row{display:flex;gap:14px;flex-wrap:wrap;}
+.field-row .field{flex:1;min-width:150px;}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:.9rem;margin-bottom:8px;}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--color-line);}
+th{color:var(--color-navy);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;}
+.status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:600;}
+.status-Approved{background:#e5ecdb;color:var(--color-olive);}
+.status-Pending{background:#f4e6d0;color:#a3711b;}
+.status-Rejected{background:#fbe0e2;color:var(--color-red);}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1 style="font-size:1.4rem;">Ericius Group — Staff Portal</h1>
+    <div class="auth-toggle">
+      <button id="tab-login" class="active" onclick="setAuthMode('login')">Log in</button>
+      <button id="tab-signup" onclick="setAuthMode('signup')">Sign up</button>
+    </div>
+
+    <form id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" required></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" required></div>
+      <button type="submit" class="btn-primary" style="width:100%;">Log in</button>
+    </form>
+
+    <form id="signup-form" class="hidden">
+      <div class="field"><label>Full name</label><input type="text" id="signup-name" required></div>
+      <div class="field"><label>Phone number</label><input type="tel" id="signup-phone" required></div>
+      <div class="field"><label>Email</label><input type="email" id="signup-email" required></div>
+      <div class="field"><label>Password</label><input type="password" id="signup-password" required minlength="6"></div>
+      <div class="checkbox-field"><input type="checkbox" id="signup-driver"><label for="signup-driver">I'm a driver (adds the vehicle trip log)</label></div>
+      <button type="submit" class="btn-primary" style="width:100%;">Create account</button>
+    </form>
+    <p id="auth-msg"></p>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <strong>Ericius Group — Staff Portal</strong>
+    <span class="who" id="who-line"></span>
+    <button class="btn-ghost" style="color:#fff;border-color:#fff;" onclick="logOut()">Log out</button>
+  </div>
+
+  <div class="wrap">
+    <div class="card-block">
+      <h2 style="font-size:1.2rem;">Apply for leave</h2>
+      <form id="leave-form">
+        <div class="field-row">
+          <div class="field"><label>Leave type</label>
+            <select id="leave-type">
+              <option>Annual</option><option>Sick</option><option>Compassionate</option><option>Unpaid</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field"><label>Start date</label><input type="date" id="leave-start" required></div>
+          <div class="field"><label>End date</label><input type="date" id="leave-end" required></div>
+        </div>
+        <div class="field"><label>Reason</label><textarea id="leave-reason" rows="2" required></textarea></div>
+        <div class="field"><label>Contact while away</label><input type="text" id="leave-contact" placeholder="Phone number"></div>
+        <button type="submit" class="btn-primary">Submit application</button>
+      </form>
+    </div>
+
+    <h2 style="font-size:1.1rem;">My leave applications</h2>
+    <table>
+      <thead><tr><th>Type</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+      <tbody id="leave-table"></tbody>
+    </table>
+
+    <div id="driver-section" class="hidden" style="margin-top:32px;">
+      <div class="card-block">
+        <h2 style="font-size:1.2rem;">Log a vehicle trip</h2>
+        <form id="trip-form">
+          <div class="field"><label>Purpose</label><input type="text" id="trip-purpose" required></div>
+          <div class="field-row">
+            <div class="field"><label>Expected distance (km)</label><input type="number" step="0.1" id="trip-distance"></div>
+            <div class="field"><label>Passengers on board</label><input type="number" id="trip-passengers" min="0"></div>
+            <div class="field"><label>Cost (if any)</label><input type="number" step="0.01" id="trip-cost"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Departure time</label><input type="datetime-local" id="trip-departure" required></div>
+            <div class="field"><label>Expected arrival</label><input type="datetime-local" id="trip-arrival"></div>
+            <div class="field"><label>Return time</label><input type="datetime-local" id="trip-return"></div>
+          </div>
+          <button type="submit" class="btn-primary">Submit for approval</button>
+        </form>
+      </div>
+
+      <h2 style="font-size:1.1rem;">My trip requests</h2>
+      <table>
+        <thead><tr><th>Purpose</th><th>Depart</th><th>Status</th></tr></thead>
+        <tbody id="trip-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
+const SUPABASE_URL = 'https://almaivbsivtjfxmftspy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_RcNwlecy97rSi5EmBIozuQ_QePUjp9y';
+// =====================================================================
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let currentProfile = null;
+
+function setAuthMode(mode){
+  document.getElementById('tab-login').classList.toggle('active', mode==='login');
+  document.getElementById('tab-signup').classList.toggle('active', mode==='signup');
+  document.getElementById('login-form').classList.toggle('hidden', mode!=='login');
+  document.getElementById('signup-form').classList.toggle('hidden', mode!=='signup');
+  document.getElementById('auth-msg').textContent = '';
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { document.getElementById('auth-msg').textContent = error.message; return; }
+  await afterLogin();
+});
+
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const full_name = document.getElementById('signup-name').value;
+  const phone = document.getElementById('signup-phone').value;
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const isDriver = document.getElementById('signup-driver').checked;
+  const { error } = await db.auth.signUp({ email, password, options: { data: { full_name, phone, role: isDriver ? 'driver' : 'employee' } } });
+  if (error) { document.getElementById('auth-msg').textContent = error.message; return; }
+  document.getElementById('auth-msg').style.color = 'var(--color-olive)';
+  document.getElementById('auth-msg').textContent = 'Account created — you can log in now.';
+});
+
+async function afterLogin(){
+  const { data: { user } } = await db.auth.getUser();
+  currentUser = user;
+  const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = profile;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('who-line').textContent = profile.full_name + ' · ' + profile.role;
+  if (profile.role === 'driver') document.getElementById('driver-section').classList.remove('hidden');
+  loadLeave();
+  if (profile.role === 'driver') loadTrips();
+}
+
+async function logOut(){
+  await db.auth.signOut();
+  location.reload();
+}
+
+document.getElementById('leave-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const row = {
+    applicant_id: currentUser.id,
+    applicant_name: currentProfile.full_name,
+    leave_type: document.getElementById('leave-type').value,
+    start_date: document.getElementById('leave-start').value,
+    end_date: document.getElementById('leave-end').value,
+    reason: document.getElementById('leave-reason').value,
+    contact: document.getElementById('leave-contact').value
+  };
+  const { error } = await db.from('leave_applications').insert(row);
+  if (error) { alert(error.message); return; }
+  e.target.reset();
+  loadLeave();
+});
+
+async function loadLeave(){
+  const { data } = await db.from('leave_applications').select('*').eq('applicant_id', currentUser.id).order('created_at', {ascending:false});
+  const tbody = document.getElementById('leave-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.leave_type||''}</td><td>${row.start_date}</td><td>${row.end_date}</td>
+      <td><span class="status-pill status-${row.status}">${row.status}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+const tripForm = document.getElementById('trip-form');
+if (tripForm) tripForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const row = {
+    driver_id: currentUser.id,
+    driver_name: currentProfile.full_name,
+    purpose: document.getElementById('trip-purpose').value,
+    expected_distance_km: parseFloat(document.getElementById('trip-distance').value) || null,
+    passengers: parseInt(document.getElementById('trip-passengers').value) || null,
+    cost: parseFloat(document.getElementById('trip-cost').value) || null,
+    departure_time: document.getElementById('trip-departure').value ? new Date(document.getElementById('trip-departure').value).toISOString() : null,
+    expected_arrival_time: document.getElementById('trip-arrival').value ? new Date(document.getElementById('trip-arrival').value).toISOString() : null,
+    return_time: document.getElementById('trip-return').value ? new Date(document.getElementById('trip-return').value).toISOString() : null
+  };
+  const { error } = await db.from('vehicle_trips').insert(row);
+  if (error) { alert(error.message); return; }
+  e.target.reset();
+  loadTrips();
+});
+
+async function loadTrips(){
+  const { data } = await db.from('vehicle_trips').select('*').eq('driver_id', currentUser.id).order('created_at', {ascending:false});
+  const tbody = document.getElementById('trip-table');
+  tbody.innerHTML = '';
+  (data||[]).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.purpose||''}</td><td>${row.departure_time ? new Date(row.departure_time).toLocaleString():''}</td>
+      <td><span class="status-pill status-${row.status}">${row.status}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) await afterLogin();
+})();
+</script>
+</body>
+</html>
